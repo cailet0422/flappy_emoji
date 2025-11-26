@@ -243,8 +243,13 @@
                 if (frames % currentSpawnRate === 0) {
                     // 갭 크기 랜덤 설정
                     const maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
-                    const minGap = (bird.radius * 2.2) * 1.5;
-                    const gap = Math.random() * (maxGap - minGap) + minGap;
+                    // 최소값: 이모지 크기의 1.5배 -> 3.0배로 증가 (기존 대비 2배 넓힘)
+                    const minGap = (bird.radius * 2.2) * 3.0;
+                    
+                    // minGap이 maxGap보다 커지는 경우 방지 (최댓값 보정)
+                    const actualMaxGap = Math.max(maxGap, minGap + 10);
+                    
+                    const gap = Math.random() * (actualMaxGap - minGap) + minGap;
 
                     const minHeight = canvas.height * 0.1;
                     const maxTop = canvas.height - minHeight - gap;
