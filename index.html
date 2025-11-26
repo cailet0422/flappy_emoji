@@ -234,11 +234,15 @@
             },
 
             update: function() {
-                // 장애물 생성 주기 (속도가 빨라지면 생성 주기도 빨라져야 자연스러움)
-                // 속도 비율에 맞춰 보정: 기본속도(3)/현재속도 * 기본주기
-                const speedRatio = baseSpeed / gameSpeed;
-                const baseSpawnRate = Math.floor(100 + (canvas.width / 10));
-                const currentSpawnRate = Math.floor(baseSpawnRate * speedRatio);
+                // [수정됨] 장애물 생성 주기 로직 개선
+                // 기존: 화면 너비(canvas.width)에 의존하여 가로가 넓으면 너무 쉬웠음.
+                // 변경: bird.radius(플레이어 크기)를 기준으로 거리를 계산하여 모든 해상도에서 형평성 유지.
+                
+                // 장애물 간의 물리적 거리 (픽셀) = 새 반지름 * 22 (적절한 간격 계수)
+                const distanceBetweenObstacles = bird.radius * 22;
+                
+                // 프레임 단위 생성 주기 = 거리 / 현재 속도
+                const currentSpawnRate = Math.floor(distanceBetweenObstacles / gameSpeed);
                 
                 if (frames % currentSpawnRate === 0) {
                     // 갭 크기 랜덤 설정
