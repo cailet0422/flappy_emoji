@@ -122,11 +122,11 @@
         let score = 0;
         let highScore = localStorage.getItem('flyingEmojiHighScore') || 0;
         
-        // 속도 관련 변수
-        const baseSpeed = 3; // 기본 속도 (100%)
-        const maxSpeed = baseSpeed * 1.5; // 최대 속도 (150% = 4.5)
-        const speedIncrement = baseSpeed * 0.1; // 증가량 (10% = 0.3)
-        let gameSpeed = baseSpeed;
+        // [수정됨] 속도 관련 변수 (let으로 변경하여 반응형 지원)
+        let baseSpeed = 3; 
+        let maxSpeed = 4.5;
+        let speedIncrement = 0.3;
+        let gameSpeed = 3;
         
         // 입력 딜레이
         let inputLocked = false;
@@ -135,13 +135,34 @@
         const faceEmojis = ['😀', '😃', '😄', '😆', '😅', '😂', '🤣', '🥲', '😛', '😜', '🤪', '😎', '🤩', '🥳', '🥴', '🤯', '🤠', '🥺', '😡', '😱'];
         const buildingEmojis = ['🏢', '🏬', '🏭', '🏥', '🏦', '🏫', '🏨'];
 
-        // 반응형 캔버스 크기 조정
+        // [추가됨] 화면 크기에 따른 속도 설정 함수
+        function setGameSpeedParams() {
+            // 화면 너비가 768px 미만(모바일)이면 속도를 25% 줄임 (3 -> 2.25)
+            // PC 등 넓은 화면이면 원래 속도 (3)
+            if (window.innerWidth < 768) {
+                baseSpeed = 2.25; 
+            } else {
+                baseSpeed = 3;
+            }
+            
+            // 파생 변수 업데이트
+            maxSpeed = baseSpeed * 1.5;
+            speedIncrement = baseSpeed * 0.1;
+            
+            // 게임 시작 전이라면 현재 속도도 업데이트
+            if (gameState === 'START') {
+                gameSpeed = baseSpeed;
+            }
+        }
+
+        // 반응형 캔버스 크기 조정 및 속도 설정
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
+            setGameSpeedParams(); // 화면 크기 변경 시 속도 재계산
         }
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        resizeCanvas(); // 초기 실행
 
         // --- 객체 클래스 ---
 
@@ -235,7 +256,7 @@
             },
 
             update: function() {
-                // [수정됨] 거리 기반 랜덤 생성 로직
+                // 거리 기반 랜덤 생성 로직
                 
                 // 1. 이동 거리 누적
                 this.distanceSinceLastSpawn += gameSpeed;
@@ -339,7 +360,7 @@
             
             reset: function() {
                 this.list = [];
-                // 게임 재시작 시 속도 초기화
+                // 게임 재시작 시 속도 초기화 (현재 환경의 baseSpeed 사용)
                 gameSpeed = baseSpeed;
                 
                 // 거리 관련 변수 초기화
