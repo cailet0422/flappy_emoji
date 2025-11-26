@@ -228,10 +228,29 @@
                 const spawnRate = Math.floor(100 + (canvas.width / 10)); 
                 
                 if (frames % spawnRate === 0) {
-                    const gap = Math.max(160, canvas.height * 0.25);
+                    // 갭 크기 랜덤 설정
+                    
+                    // 1. 최댓값: 기존 기본값(화면 높이의 25% 또는 160px)보다 1.2배 정도 크게
+                    const maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
+                    
+                    // 2. 최소값: 이모지 시각적 크기(지름 * 1.1 정도인 폰트사이즈)의 1.5배
+                    // bird.radius * 2.2는 현재 이모지가 그려지는 폰트 크기입니다.
+                    const minGap = (bird.radius * 2.2) * 1.5;
+
+                    // 3. 랜덤 갭 계산 (최소 ~ 최대 사이)
+                    const gap = Math.random() * (maxGap - minGap) + minGap;
+
                     const minHeight = canvas.height * 0.1;
                     const maxTop = canvas.height - minHeight - gap;
-                    const topHeight = Math.floor(Math.random() * (maxTop - minHeight + 1) + minHeight);
+                    
+                    // maxTop이 minHeight보다 작아지는 극단적인 경우 방지
+                    if (maxTop < minHeight) {
+                        // 화면이 너무 작을 경우 안전값 사용
+                        var topHeight = minHeight; 
+                    } else {
+                        var topHeight = Math.floor(Math.random() * (maxTop - minHeight + 1) + minHeight);
+                    }
+                    
                     const bottomHeight = canvas.height - gap - topHeight;
 
                     this.list.push({
