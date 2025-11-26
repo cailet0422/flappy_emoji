@@ -7,7 +7,7 @@
     
     <!-- [중요] 구글 애드센스 자동 광고 스크립트 -->
     <!-- 아래 ca-pub- 뒤의 숫자를 본인의 실제 게시자 ID로 변경하세요 -->
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-0000000000000000"
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4900244474968005"
      crossorigin="anonymous"></script>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -355,6 +355,7 @@
             gameState = 'PLAYING';
             startScreen.classList.add('hidden');
             gameOverScreen.classList.add('hidden');
+            gameOverScreen.style.display = ''; // 인라인 스타일 제거 (flex 강제 해제)
             initGame();
             loop();
         }
