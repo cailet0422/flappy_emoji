@@ -112,17 +112,16 @@
         const restartBtn = document.getElementById('restartBtn');
 
         // 오디오 설정 (동전 효과음)
-        // 무료 효과음 URL 사용
         const coinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
-        coinSound.volume = 0.5; // 볼륨 조절
+        coinSound.volume = 0.5; 
 
         // 게임 상태
-        let gameState = 'START'; // START, PLAYING, GAMEOVER
+        let gameState = 'START'; 
         let frames = 0;
         let score = 0;
         let highScore = localStorage.getItem('flyingEmojiHighScore') || 0;
         
-        // [수정됨] 속도 관련 변수 (let으로 변경하여 반응형 지원)
+        // 속도 관련 변수 
         let baseSpeed = 3; 
         let maxSpeed = 4.5;
         let speedIncrement = 0.3;
@@ -130,39 +129,40 @@
         
         // 입력 딜레이
         let inputLocked = false;
-        // [수정됨] OS 감지에 따른 속도 설정 함수
+
+        // 이모지 데이터
+        const faceEmojis = ['😀', '😃', '😄', '😆', '😅', '😂', '🤣', '🥲', '😛', '😜', '🤪', '😎', '🤩', '🥳', '🥴', '🤯', '🤠', '🥺', '😡', '😱'];
+        const buildingEmojis = ['🏢', '🏬', '🏭', '🏥', '🏦', '🏫', '🏨'];
+
+        // OS 감지에 따른 속도 설정 함수
         function setGameSpeedParams() {
             const ua = navigator.userAgent;
-            
-            // Android 또는 iOS(iPhone, iPad, iPod) 감지
-            // 참고: iPadOS 13+부터는 데스크탑 모드로 동작하여 MacIntel로 표시될 수 있으므로 터치 포인트도 함께 확인
             const isAndroid = /Android/i.test(ua);
             const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
             if (isAndroid || isIOS) {
-                baseSpeed = 2.25; // 모바일 OS면 속도를 25% 줄임 (3 -> 2.25)
+                baseSpeed = 2.25; 
             } else {
-                baseSpeed = 3;    // PC 및 기타 OS는 기본 속도
+                baseSpeed = 3;    
             }
             
-            // 파생 변수 업데이트
             maxSpeed = baseSpeed * 1.5;
             speedIncrement = baseSpeed * 0.1;
             
-            // 게임 시작 전이라면 현재 속도도 업데이트
             if (gameState === 'START') {
                 gameSpeed = baseSpeed;
             }
         }
 
-        // 반응형 캔버스 크기 조정 및 속도 설정
+        // 반응형 캔버스 크기 조정
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            setGameSpeedParams(); // 화면 크기 변경 시(또는 초기 로드 시) OS 체크 및 속도 설정
+            setGameSpeedParams(); 
+            // 화면 크기가 변하면 플레이어 크기와 위치도 업데이트
+            if (bird) bird.updateDimensions();
         }
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas(); // 초기 실행
 
         // --- 객체 클래스 ---
 
@@ -180,12 +180,13 @@
             draw: function() {
                 ctx.save();
                 ctx.translate(this.x, this.y);
-                // 속도에 따라 회전 (떨어질 때 고개 숙임)
                 let targetRotation = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (this.velocity * 0.1)));
                 this.rotation = targetRotation;
                 ctx.rotate(this.rotation);
                 
-                ctx.font = `${this.radius * 2.2}px Arial`; 
+                // radius가 유효한지 확인
+                const fontSize = (this.radius && this.radius > 0) ? this.radius * 2.2 : 44;
+                ctx.font = `${fontSize}px Arial`; 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.currentEmoji, 0, 5); 
@@ -214,30 +215,39 @@
                 this.currentEmoji = faceEmojis[Math.floor(Math.random() * faceEmojis.length)];
             },
             
-            reset: function() {
+            // 크기만 업데이트 (리사이즈 시 호출)
+            updateDimensions: function() {
+                this.radius = Math.min(window.innerWidth, window.innerHeight) * 0.05; 
+                if (this.radius < 15) this.radius = 15;
+                if (this.radius > 30) this.radius = 30;
+            },
+
+            // 위치와 상태 초기화 (게임 시작 시 호출)
+            resetPosition: function() {
                 this.x = canvas.width * 0.2; 
                 this.y = canvas.height / 2;
                 this.velocity = 0;
                 this.currentEmoji = '😀';
-                this.radius = Math.min(window.innerWidth, window.innerHeight) * 0.05; 
-                if (this.radius < 15) this.radius = 15;
-                if (this.radius > 30) this.radius = 30;
+                this.updateDimensions(); // 크기도 재설정
             }
         };
 
         // 장애물 (건물들)
         const obstacles = {
             list: [],
-            distanceSinceLastSpawn: 0, // 마지막 생성 이후 이동한 거리
-            nextSpawnDistance: 0,      // 다음 생성까지 필요한 거리
+            distanceSinceLastSpawn: 0, 
+            nextSpawnDistance: 0,      
             
             draw: function() {
                 for (let i = 0; i < this.list.length; i++) {
                     let obs = this.list[i];
+                    if (!obs) continue; // 방어 코드
                     
                     ctx.fillStyle = '#777'; 
 
                     let emojiSize = obs.width;
+                    if (!emojiSize || emojiSize <= 0) emojiSize = 40; // 방어 코드
+
                     ctx.font = `${emojiSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
@@ -256,33 +266,43 @@
             },
 
             update: function() {
-                // 거리 기반 랜덤 생성 로직
-                
-                // 1. 이동 거리 누적
                 this.distanceSinceLastSpawn += gameSpeed;
 
-                // 2. 생성 시점 도달 체크
                 if (this.distanceSinceLastSpawn >= this.nextSpawnDistance) {
                     
-                    // 갭 크기 설정 (기존 로직 유지: 랜덤 높이)
-                    const maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
-                    const minGap = (bird.radius * 2.2) * 3.0;
-                    const actualMaxGap = Math.max(maxGap, minGap + 10);
-                    const gap = Math.random() * (actualMaxGap - minGap) + minGap;
-
+                    // [중요 수정] 갭(빈 공간) 계산 안전장치 추가
+                    // 화면 높이의 최소 여백(위, 아래 각 10%)을 제외한 가용 공간 계산
                     const minHeight = canvas.height * 0.1;
+                    const availableHeight = canvas.height - (minHeight * 2);
+                    
+                    // 계산된 갭이 가용 공간보다 크면 강제로 줄임 (화면보다 큰 구멍 방지)
+                    let maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
+                    let minGap = (bird.radius * 2.2) * 3.0;
+                    
+                    // minGap이 너무 커서 가용 공간을 넘어가면 조절
+                    if (minGap > availableHeight) minGap = availableHeight * 0.8;
+                    if (maxGap > availableHeight) maxGap = availableHeight;
+                    
+                    // minGap이 maxGap보다 커지는 역전 현상 방지
+                    const actualMaxGap = Math.max(maxGap, minGap + 10);
+                    
+                    let gap = Math.random() * (actualMaxGap - minGap) + minGap;
+                    
+                    // 최종 안전장치: 갭이 너무 커서 파이프가 사라지는 것 방지
+                    if (gap > availableHeight) gap = availableHeight;
+
                     const maxTop = canvas.height - minHeight - gap;
                     
                     let topHeight;
-                    if (maxTop < minHeight) {
+                    if (maxTop <= minHeight) {
                         topHeight = minHeight; 
                     } else {
                         topHeight = Math.floor(Math.random() * (maxTop - minHeight + 1) + minHeight);
                     }
                     
-                    const bottomHeight = canvas.height - gap - topHeight;
+                    // bottomHeight가 음수가 되지 않도록 보장
+                    const bottomHeight = Math.max(minHeight, canvas.height - gap - topHeight);
 
-                    // 장애물 추가
                     this.list.push({
                         x: canvas.width,
                         width: bird.radius * 3.5, 
@@ -292,19 +312,11 @@
                         buildingType: buildingEmojis[Math.floor(Math.random() * buildingEmojis.length)]
                     });
 
-                    // 3. 다음 생성 거리(Interval) 랜덤 설정
-                    // 기준 거리: bird.radius * 22
+                    // 다음 생성 거리 설정
                     const baseDistance = bird.radius * 22;
-                    
-                    // 최소: 기준의 50% (절반)
                     const minDistance = baseDistance * 0.5;
-                    // 최대: 기준의 120% (20% 더 넓게)
                     const maxDistance = baseDistance * 1.2;
-                    
-                    // 랜덤 거리 설정
                     this.nextSpawnDistance = Math.random() * (maxDistance - minDistance) + minDistance;
-                    
-                    // 누적 거리 초기화
                     this.distanceSinceLastSpawn = 0;
                 }
 
@@ -327,26 +339,18 @@
                         gameOver();
                     }
 
-                    // 점수 및 속도 증가 로직
                     if (obs.x + obs.width < bird.x && !obs.passed) {
                         score++;
                         scoreDisplay.innerText = score;
                         obs.passed = true;
                         
-                        // 5점마다 이벤트 발생
                         if (score % 5 === 0) {
-                            // 1. 동전 소리 재생
-                            // 연속 재생을 위해 currentTime 초기화
                             coinSound.currentTime = 0;
-                            coinSound.play().catch(e => console.log('Audio play failed:', e));
+                            coinSound.play().catch(e => console.log('Audio error handled'));
 
-                            // 2. 속도 증가 (10%씩)
                             if (gameSpeed < maxSpeed) {
                                 gameSpeed += speedIncrement;
-                                // 최대 속도 초과 방지
-                                if (gameSpeed > maxSpeed) {
-                                    gameSpeed = maxSpeed;
-                                }
+                                if (gameSpeed > maxSpeed) gameSpeed = maxSpeed;
                             }
                         }
                     }
@@ -360,13 +364,11 @@
             
             reset: function() {
                 this.list = [];
-                // 게임 재시작 시 속도 초기화 (현재 환경의 baseSpeed 사용)
                 gameSpeed = baseSpeed;
-                
-                // 거리 관련 변수 초기화
                 this.distanceSinceLastSpawn = 0;
-                // 첫 장애물은 약간의 여유를 두고 생성 (기준 거리만큼)
-                this.nextSpawnDistance = bird.radius * 22;
+                // bird.radius가 유효한지 확인 후 거리 설정
+                const radius = (bird.radius && bird.radius > 0) ? bird.radius : 20;
+                this.nextSpawnDistance = radius * 22;
             }
         };
 
@@ -409,7 +411,7 @@
         // --- 게임 로직 ---
 
         function initGame() {
-            bird.reset();
+            bird.resetPosition(); // resetPosition으로 변경
             obstacles.reset();
             score = 0;
             frames = 0;
@@ -425,9 +427,6 @@
             if (gameState === 'PLAYING') return;
 
             gameState = 'PLAYING';
-            
-            // 모바일 오디오 컨텍스트 활성화를 위해 사용자 인터랙션 시점에 load() 호출 가능
-            // (현대 브라우저는 사용자 제스처(클릭) 내에서 play() 하면 허용됨)
             
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
@@ -480,7 +479,7 @@
                 obstacles.draw();
                 bird.draw();
             } else if (gameState === 'START') {
-                 
+                background.update(); // 시작 화면에서도 구름 움직임
             }
 
             animationId = requestAnimationFrame(loop);
@@ -520,6 +519,8 @@
         restartBtn.addEventListener('touchend', handleButtonClick, {passive: false});
         restartBtn.addEventListener('click', handleButtonClick);
 
+        // 초기화
+        resizeCanvas();
         loop();
 
     </script>
