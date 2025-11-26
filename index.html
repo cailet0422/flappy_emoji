@@ -126,7 +126,7 @@
 
     <script>
         // --- Gemini API 설정 ---
-        const apiKey = "AIzaSyDx5c2u3CdSHPwzSMLzYCdLQKwHNXvmsOk"; // API 키는 실행 환경에서 자동으로 제공됩니다.
+        const apiKey = ""; // API 키는 실행 환경에서 자동으로 제공됩니다.
 
         // --- 게임 설정 및 변수 ---
         const canvas = document.getElementById('gameCanvas');
@@ -150,6 +150,27 @@
         const coinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
         coinSound.volume = 0.5; 
 
+        // [수정됨] 배경음악 (BGM) - If I Had a Chicken by Kevin MacLeod (주소 수정 및 백업 추가)
+        // 라이선스: Creative Commons: By Attribution 4.0 License
+        // 1순위: Kevin MacLeod 공식 (파일명 'If' 추가됨)
+        const bgm = new Audio('https://incompetech.com/music/royalty-free/mp3-royaltyfree/If%20I%20Had%20A%20Chicken.mp3');
+        
+        // 백업용 음악 (Mixkit - Comical)
+        const backupBgmUrl = 'https://assets.mixkit.co/music/preview/mixkit-comical-2-22.mp3';
+
+        bgm.loop = true; // 반복 재생
+        bgm.volume = 0.3; // 배경음악 볼륨
+
+        // 음악 로드 실패 시 백업으로 전환
+        bgm.onerror = function() {
+            console.warn("메인 BGM 로드 실패. 백업 음원으로 전환합니다.");
+            bgm.src = backupBgmUrl;
+            // 게임 중이라면 바로 재생 시도
+            if (gameState === 'PLAYING') {
+                bgm.play().catch(e => console.log('Backup BGM play failed:', e));
+            }
+        };
+
         // 게임 상태
         let gameState = 'START'; 
         let frames = 0;
@@ -172,13 +193,11 @@
         // --- Gemini AI 테마 생성 로직 ---
         async function generateAITheme() {
             if (!apiKey) {
-                // 로컬 개발 환경 등에서 API 키가 없을 때 대비
                 console.warn("API Key not found.");
                 aiStatus.innerText = "API 키 오류";
                 return;
             }
 
-            // 버튼 로딩 상태
             aiThemeBtn.disabled = true;
             aiThemeBtn.innerHTML = '<span class="loader"></span> 생성 중...';
             aiStatus.innerText = "Gemini가 창의적인 테마를 생각 중입니다...";
@@ -215,7 +234,6 @@
                 const data = await response.json();
                 const theme = JSON.parse(data.candidates[0].content.parts[0].text);
 
-                // 테마 적용
                 applyTheme(theme);
                 aiStatus.innerText = "테마 적용 완료! ✨";
 
@@ -223,7 +241,6 @@
                 console.error('AI Error:', error);
                 aiStatus.innerText = "생성 실패. 다시 시도해주세요.";
             } finally {
-                // 버튼 상태 복구
                 aiThemeBtn.disabled = false;
                 aiThemeBtn.innerHTML = '<span>✨ AI 테마 변경</span>';
                 setTimeout(() => { aiStatus.innerText = ""; }, 3000);
@@ -231,26 +248,21 @@
         }
 
         function applyTheme(theme) {
-            // 데이터 업데이트
             faceEmojis = theme.playerEmojis;
             buildingEmojis = theme.obstacleEmojis;
             
-            // UI 업데이트
             themeTitle.innerText = `현재 테마: ${theme.title}`;
             document.body.style.backgroundColor = theme.backgroundColor;
             
-            // 데모 이모지 변경
             demoEmoji.innerText = faceEmojis[0];
             
-            // 게임 내 객체 초기화
             if (bird) {
                 bird.currentEmoji = faceEmojis[0];
             }
         }
 
-        // AI 버튼 이벤트 리스너
         aiThemeBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // 게임 시작 방지
+            e.stopPropagation();
             generateAITheme();
         });
         aiThemeBtn.addEventListener('touchend', (e) => {
@@ -261,7 +273,6 @@
 
         // --- 기존 게임 로직 ---
 
-        // OS 감지에 따른 속도 설정 함수
         function setGameSpeedParams() {
             const ua = navigator.userAgent;
             const isAndroid = /Android/i.test(ua);
@@ -281,19 +292,16 @@
             }
         }
 
-        // 반응형 캔버스 크기 조정
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             setGameSpeedParams(); 
-            // 화면 크기가 변하면 플레이어 크기와 위치도 업데이트
             if (bird) bird.updateDimensions();
         }
         window.addEventListener('resize', resizeCanvas);
 
         // --- 객체 클래스 ---
 
-        // 플레이어 (새/이모지)
         const bird = {
             x: 50,
             y: 150,
@@ -311,7 +319,6 @@
                 this.rotation = targetRotation;
                 ctx.rotate(this.rotation);
                 
-                // radius가 유효한지 확인
                 const fontSize = (this.radius && this.radius > 0) ? this.radius * 2.2 : 44;
                 ctx.font = `${fontSize}px Arial`; 
                 ctx.textAlign = 'center';
@@ -324,13 +331,11 @@
                 this.velocity += this.gravity;
                 this.y += this.velocity;
 
-                // 바닥 충돌
                 if (this.y + this.radius >= canvas.height - 20) { 
                     this.y = canvas.height - 20 - this.radius;
                     gameOver();
                 }
 
-                // 천장 충돌 방지
                 if (this.y - this.radius <= 0) {
                     this.y = this.radius;
                     this.velocity = 0;
@@ -342,25 +347,21 @@
                 this.currentEmoji = faceEmojis[Math.floor(Math.random() * faceEmojis.length)];
             },
             
-            // 크기만 업데이트 (리사이즈 시 호출)
             updateDimensions: function() {
                 this.radius = Math.min(window.innerWidth, window.innerHeight) * 0.05; 
                 if (this.radius < 15) this.radius = 15;
                 if (this.radius > 30) this.radius = 30;
             },
 
-            // 위치와 상태 초기화 (게임 시작 시 호출)
             resetPosition: function() {
                 this.x = canvas.width * 0.2; 
                 this.y = canvas.height / 2;
                 this.velocity = 0;
-                // 현재 테마의 첫 번째 이모지로 초기화, 없으면 기본값
                 this.currentEmoji = faceEmojis.length > 0 ? faceEmojis[0] : '😀';
-                this.updateDimensions(); // 크기도 재설정
+                this.updateDimensions(); 
             }
         };
 
-        // 장애물 (건물들)
         const obstacles = {
             list: [],
             distanceSinceLastSpawn: 0, 
@@ -369,23 +370,21 @@
             draw: function() {
                 for (let i = 0; i < this.list.length; i++) {
                     let obs = this.list[i];
-                    if (!obs) continue; // 방어 코드
+                    if (!obs) continue; 
                     
                     ctx.fillStyle = '#777'; 
 
                     let emojiSize = obs.width;
-                    if (!emojiSize || emojiSize <= 0) emojiSize = 40; // 방어 코드
+                    if (!emojiSize || emojiSize <= 0) emojiSize = 40;
 
                     ctx.font = `${emojiSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
                     
-                    // 위쪽 파이프
                     for (let y = obs.top; y > -emojiSize; y -= emojiSize * 0.8) {
                          ctx.fillText(obs.buildingType, obs.x + obs.width/2, y);
                     }
 
-                    // 아래쪽 파이프
                     ctx.textBaseline = 'top';
                     for (let y = canvas.height - obs.bottom; y < canvas.height + emojiSize; y += emojiSize * 0.8) {
                         ctx.fillText(obs.buildingType, obs.x + obs.width/2, y);
@@ -398,7 +397,6 @@
 
                 if (this.distanceSinceLastSpawn >= this.nextSpawnDistance) {
                     
-                    // 갭(빈 공간) 계산 안전장치
                     const minHeight = canvas.height * 0.1;
                     const availableHeight = canvas.height - (minHeight * 2);
                     
@@ -430,11 +428,9 @@
                         top: topHeight,
                         bottom: bottomHeight,
                         passed: false,
-                        // 현재 테마의 장애물 이모지 중 랜덤 선택
                         buildingType: buildingEmojis[Math.floor(Math.random() * buildingEmojis.length)]
                     });
 
-                    // 다음 생성 거리 설정
                     const baseDistance = bird.radius * 22;
                     const minDistance = baseDistance * 0.5;
                     const maxDistance = baseDistance * 1.2;
@@ -453,7 +449,6 @@
                     const birdTop = bird.y - bird.radius + hitBoxPadding;
                     const birdBottom = bird.y + bird.radius - hitBoxPadding;
 
-                    // 충돌 체크
                     if (birdRight > obs.x && birdLeft < obs.x + obs.width && birdTop < obs.top) {
                         gameOver();
                     }
@@ -493,7 +488,6 @@
             }
         };
 
-        // 배경
         const background = {
             clouds: [],
             draw: function() {
@@ -532,7 +526,7 @@
         // --- 게임 로직 ---
 
         function initGame() {
-            bird.resetPosition(); // resetPosition으로 변경
+            bird.resetPosition();
             obstacles.reset();
             score = 0;
             frames = 0;
@@ -551,6 +545,10 @@
             
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
+
+            // [추가됨] 배경음악 재생 (게임 시작 시)
+            bgm.currentTime = 0;
+            bgm.play().catch(e => console.log('BGM play failed:', e));
             
             initGame();
             
@@ -569,6 +567,9 @@
         function gameOver() {
             if (gameState === 'GAMEOVER') return;
             gameState = 'GAMEOVER';
+
+            // [추가됨] 배경음악 정지 (게임 오버 시)
+            bgm.pause();
             
             scoreDisplay.classList.add('hidden');
             highScoreDisplay.classList.add('hidden');
@@ -600,7 +601,7 @@
                 obstacles.draw();
                 bird.draw();
             } else if (gameState === 'START') {
-                background.update(); // 시작 화면에서도 구름 움직임
+                background.update();
             }
 
             animationId = requestAnimationFrame(loop);
@@ -640,7 +641,6 @@
         restartBtn.addEventListener('touchend', handleButtonClick, {passive: false});
         restartBtn.addEventListener('click', handleButtonClick);
 
-        // 초기화
         resizeCanvas();
         loop();
 
