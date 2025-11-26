@@ -430,9 +430,17 @@
         canvas.addEventListener('touchstart', handleInput, {passive: false});
         canvas.addEventListener('mousedown', handleInput);
 
-        // 버튼 이벤트
+        // [수정됨] 버튼 이벤트 (모바일 터치 반응성 개선)
+        function handleBtnTouch(e) {
+            if (e.cancelable) e.preventDefault(); // 터치 시 고스트 클릭 및 확대 방지
+            startGame();
+        }
+
         startBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('touchstart', handleBtnTouch, {passive: false});
+
         restartBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('touchstart', handleBtnTouch, {passive: false});
 
         // 초기 화면 렌더링 (배경만)
         background.update(); // 구름 몇 개 생성
