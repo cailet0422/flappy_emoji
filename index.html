@@ -19,6 +19,8 @@
             overflow: hidden;
             touch-action: none; /* 모바일에서 스크롤 방지 */
             background-color: #70c5ce; /* 하늘색 배경 */
+            -webkit-user-select: none; /* 텍스트 선택 방지 */
+            user-select: none;
         }
         canvas {
             display: block;
@@ -36,13 +38,14 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            z-index: 50; /* 레이어 순서 확실히 앞으로 */
         }
         .interactive {
             pointer-events: auto;
         }
-        /* 아이폰 노치 등 안전 영역 대응 */
-        .pb-safe {
-            padding-bottom: env(safe-area-inset-bottom, 20px);
+        /* 버튼 눌림 효과 */
+        .btn-press:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
@@ -60,20 +63,20 @@
     </div>
 
     <!-- 시작 화면 -->
-    <div id="startScreen" class="game-layer bg-black/40 backdrop-blur-sm z-20">
+    <div id="startScreen" class="game-layer bg-black/40 backdrop-blur-sm">
         <div class="bg-white/90 p-8 rounded-2xl shadow-2xl text-center interactive max-w-sm mx-4 border-4 border-blue-400">
             <h1 class="text-5xl font-bold text-blue-600 mb-2">Flying Emoji</h1>
             <p class="text-gray-600 mb-6 text-lg">이모지가 되어 건물 사이를 날아보세요!</p>
             <div class="text-6xl animate-bounce mb-6">🤪</div>
             <p class="text-sm text-gray-500 mb-4">터치 또는 클릭으로 점프<br>점프할 때마다 표정이 바뀝니다!</p>
-            <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-8 rounded-full text-2xl shadow-lg transform transition active:scale-95">
+            <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-10 rounded-full text-2xl shadow-lg btn-press">
                 게임 시작
             </button>
         </div>
     </div>
 
     <!-- 게임 오버 화면 -->
-    <div id="gameOverScreen" class="game-layer bg-black/60 backdrop-blur-md z-30 hidden">
+    <div id="gameOverScreen" class="game-layer bg-black/60 backdrop-blur-md hidden" style="display: none;">
         <div class="bg-white/90 p-8 rounded-2xl shadow-2xl text-center interactive max-w-sm mx-4 border-4 border-red-400 relative">
             <h2 class="text-5xl font-bold text-red-500 mb-4">게임 오버!</h2>
             <div class="flex justify-center space-x-8 mb-6">
@@ -86,11 +89,11 @@
                     <p id="bestScore" class="text-4xl font-bold text-yellow-500">0</p>
                 </div>
             </div>
-            <button id="restartBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-8 rounded-full text-2xl shadow-lg transform transition active:scale-95">
+            <!-- 모바일에서 터치하기 쉽도록 버튼 크기 확대 -->
+            <button id="restartBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-12 rounded-full text-3xl shadow-lg btn-press w-full">
                 다시 하기
             </button>
         </div>
-        <!-- 직접 삽입했던 광고 영역 삭제됨 (자동 광고가 대신 함) -->
     </div>
 
     <script>
@@ -114,6 +117,9 @@
         let score = 0;
         let highScore = localStorage.getItem('flyingEmojiHighScore') || 0;
         let gameSpeed = 3;
+        
+        // 입력 딜레이 (모바일에서 버튼 누른 후 바로 점프되는 현상 방지)
+        let inputLocked = false;
 
         // 이모지 데이터
         const faceEmojis = ['😀', '😃', '😄', '😆', '😅', '😂', '🤣', '🥲', '😛', '😜', '🤪', '😎', '🤩', '🥳', '🥴', '🤯', '🤠', '🥺', '😡', '😱'];
@@ -148,7 +154,7 @@
                 this.rotation = targetRotation;
                 ctx.rotate(this.rotation);
                 
-                ctx.font = `${this.radius * 2.2}px Arial`; // 이모지 크기 조정
+                ctx.font = `${this.radius * 2.2}px Arial`; 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(this.currentEmoji, 0, 5); // 약간의 y 보정
@@ -160,12 +166,12 @@
                 this.y += this.velocity;
 
                 // 바닥 충돌
-                if (this.y + this.radius >= canvas.height - 20) { // -20은 바닥 여백
+                if (this.y + this.radius >= canvas.height - 20) { 
                     this.y = canvas.height - 20 - this.radius;
                     gameOver();
                 }
 
-                // 천장 충돌 방지 (선택 사항)
+                // 천장 충돌 방지
                 if (this.y - this.radius <= 0) {
                     this.y = this.radius;
                     this.velocity = 0;
@@ -174,16 +180,15 @@
 
             jump: function() {
                 this.velocity = -this.jumpStrength;
-                // 점프할 때마다 랜덤 표정으로 변경
                 this.currentEmoji = faceEmojis[Math.floor(Math.random() * faceEmojis.length)];
             },
             
             reset: function() {
-                this.x = canvas.width * 0.2; // 화면의 20% 지점
+                this.x = canvas.width * 0.2; 
                 this.y = canvas.height / 2;
                 this.velocity = 0;
                 this.currentEmoji = '😀';
-                this.radius = Math.min(window.innerWidth, window.innerHeight) * 0.05; // 화면 크기에 비례
+                this.radius = Math.min(window.innerWidth, window.innerHeight) * 0.05; 
                 if (this.radius < 15) this.radius = 15;
                 if (this.radius > 30) this.radius = 30;
             }
@@ -198,26 +203,19 @@
                 for (let i = 0; i < this.list.length; i++) {
                     let obs = this.list[i];
                     
-                    // 건물 스타일 (회색 기둥 위에 이모지 패턴)
-                    // 위쪽 건물
                     ctx.fillStyle = '#777'; 
-                    // ctx.fillRect(obs.x, 0, obs.width, obs.top); // 배경 기둥
-                    
-                    // 아래쪽 건물
-                    // ctx.fillRect(obs.x, canvas.height - obs.bottom, obs.width, obs.bottom); // 배경 기둥
 
-                    // 이모지로 건물 채우기 (위쪽)
                     let emojiSize = obs.width;
                     ctx.font = `${emojiSize}px Arial`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'bottom';
                     
-                    // 위쪽 파이프 (건물) 그리기
+                    // 위쪽 파이프
                     for (let y = obs.top; y > -emojiSize; y -= emojiSize * 0.8) {
                          ctx.fillText(obs.buildingType, obs.x + obs.width/2, y);
                     }
 
-                    // 아래쪽 파이프 (건물) 그리기
+                    // 아래쪽 파이프
                     ctx.textBaseline = 'top';
                     for (let y = canvas.height - obs.bottom; y < canvas.height + emojiSize; y += emojiSize * 0.8) {
                         ctx.fillText(obs.buildingType, obs.x + obs.width/2, y);
@@ -226,11 +224,10 @@
             },
 
             update: function() {
-                // 장애물 생성 주기 (화면 너비에 따라 조절)
+                // 장애물 생성 주기
                 const spawnRate = Math.floor(100 + (canvas.width / 10)); 
                 
                 if (frames % spawnRate === 0) {
-                    // 갭 크기 설정 (화면 높이 비례)
                     const gap = Math.max(160, canvas.height * 0.25);
                     const minHeight = canvas.height * 0.1;
                     const maxTop = canvas.height - minHeight - gap;
@@ -239,7 +236,7 @@
 
                     this.list.push({
                         x: canvas.width,
-                        width: bird.radius * 3.5, // 플레이어 크기에 비례한 장애물 너비
+                        width: bird.radius * 3.5, 
                         top: topHeight,
                         bottom: bottomHeight,
                         passed: false,
@@ -251,35 +248,29 @@
                     let obs = this.list[i];
                     obs.x -= gameSpeed;
 
-                    // 충돌 감지 (간단한 AABB 충돌)
-                    // 이모지는 원형이지만, 히트박스는 사각형으로 처리하여 난이도 조절
-                    const hitBoxPadding = bird.radius * 0.6; // 약간 여유를 둠
+                    const hitBoxPadding = bird.radius * 0.6; 
 
-                    // 새의 히트박스
                     const birdLeft = bird.x - bird.radius + hitBoxPadding;
                     const birdRight = bird.x + bird.radius - hitBoxPadding;
                     const birdTop = bird.y - bird.radius + hitBoxPadding;
                     const birdBottom = bird.y + bird.radius - hitBoxPadding;
 
-                    // 위쪽 건물 충돌
+                    // 충돌 체크
                     if (birdRight > obs.x && birdLeft < obs.x + obs.width && birdTop < obs.top) {
                         gameOver();
                     }
-                    // 아래쪽 건물 충돌
                     if (birdRight > obs.x && birdLeft < obs.x + obs.width && birdBottom > canvas.height - obs.bottom) {
                         gameOver();
                     }
 
-                    // 점수 획득
+                    // 점수
                     if (obs.x + obs.width < bird.x && !obs.passed) {
                         score++;
                         scoreDisplay.innerText = score;
                         obs.passed = true;
-                        // 난이도 상승 (속도 약간 증가, 최대치 제한)
                         if(score % 5 === 0 && gameSpeed < 6) gameSpeed += 0.2;
                     }
 
-                    // 화면 밖으로 나간 장애물 제거
                     if (obs.x + obs.width < 0) {
                         this.list.shift();
                         i--;
@@ -289,20 +280,17 @@
             
             reset: function() {
                 this.list = [];
-                gameSpeed = 3 + (canvas.width > 768 ? 1 : 0); // PC에서는 조금 더 빠르게 시작
+                gameSpeed = 3 + (canvas.width > 768 ? 1 : 0); 
             }
         };
 
-        // 배경 (구름)
+        // 배경
         const background = {
             clouds: [],
-            
             draw: function() {
-                // 바닥 그리기
-                ctx.fillStyle = '#ded895'; // 땅 색깔
+                ctx.fillStyle = '#ded895'; 
                 ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
                 
-                // 구름 그리기
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
                 this.clouds.forEach(cloud => {
                     ctx.beginPath();
@@ -312,9 +300,7 @@
                     ctx.fill();
                 });
             },
-            
             update: function() {
-                // 구름 생성
                 if (Math.random() < 0.01) {
                     this.clouds.push({
                         x: canvas.width + 50,
@@ -323,8 +309,6 @@
                         speed: Math.random() * 0.5 + 0.2
                     });
                 }
-                
-                // 구름 이동
                 for (let i = 0; i < this.clouds.length; i++) {
                     let cloud = this.clouds[i];
                     cloud.x -= cloud.speed;
@@ -352,20 +336,46 @@
         }
 
         function startGame() {
+            if (gameState === 'PLAYING') return; // 이미 실행중이면 무시
+
             gameState = 'PLAYING';
-            startScreen.classList.add('hidden');
-            gameOverScreen.classList.add('hidden');
-            gameOverScreen.style.display = ''; // 인라인 스타일 제거 (flex 강제 해제)
+            
+            // UI 확실하게 숨기기
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
             initGame();
-            loop();
+            
+            // 모바일에서 버튼 누른 터치가 바로 점프로 이어지지 않도록 딜레이 설정
+            inputLocked = true;
+            setTimeout(() => {
+                inputLocked = false;
+                // 게임이 멈춰있을 수 있으므로 루프가 돌고 있는지 확인
+                // requestAnimationFrame이 쌓이는 것을 방지하기 위해 loop는 한 번만 호출됨을 보장해야 하지만
+                // 여기서는 간단하게 처리 (중복 호출 방지는 loop 내부에 없음)
+                // loop(); 는 최초 시작시 혹은 재시작시 호출하되, 
+                // 기존 루프가 돌고 있다면 굳이 중복해서 부르지 않아도 되지만 
+                // 안전을 위해 cancelAnimationFrame 등을 쓰지 않는 구조이므로 
+                // 게임오버 시 루프가 멈추지 않고 계속 도는 구조임 (gameState로 제어)
+                // 따라서 별도 호출 불필요. update/draw만 gameState에 따름.
+            }, 300);
+
+            // 루프 시작 (게임 오버시에도 루프는 계속 돌고 있으므로, 상태만 변경하면 됨)
+            // 만약 루프가 끊겼다면 다시 불러줘야 함
+            if (!animationId) {
+                loop();
+            }
         }
 
+        let animationId;
+
         function gameOver() {
+            if (gameState === 'GAMEOVER') return;
             gameState = 'GAMEOVER';
+            
             scoreDisplay.classList.add('hidden');
             highScoreDisplay.classList.add('hidden');
             
-            // 최고 점수 갱신
             if (score > highScore) {
                 highScore = score;
                 localStorage.setItem('flyingEmojiHighScore', highScore);
@@ -374,77 +384,84 @@
             finalScoreEl.innerText = score;
             bestScoreEl.innerText = highScore;
             
-            gameOverScreen.classList.remove('hidden');
-            gameOverScreen.style.display = 'flex'; // flex 레이아웃 강제
+            // 화면 확실하게 보이기
+            gameOverScreen.style.display = 'flex';
         }
 
         function loop() {
-            // 화면 지우기
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 업데이트 & 그리기
             background.update();
             background.draw();
 
             if (gameState === 'PLAYING') {
                 obstacles.update();
                 obstacles.draw();
-                
                 bird.update();
                 bird.draw();
-                
                 frames++;
-                requestAnimationFrame(loop);
             } else if (gameState === 'GAMEOVER') {
-                // 게임 오버 시에도 정지된 화면 그려주기
                 obstacles.draw();
                 bird.draw();
+            } else if (gameState === 'START') {
+                 // 시작 화면에서도 배경 구름 움직임
             }
+
+            animationId = requestAnimationFrame(loop);
         }
 
-        // --- 입력 처리 ---
+        // --- 입력 및 이벤트 처리 (새로 작성된 부분) ---
 
-        function handleInput(e) {
-            if (e.type !== 'keydown') {
-                 e.preventDefault(); // 터치 시 더블탭 확대 방지 등
+        // 1. 게임 플레이 중 점프 핸들러
+        function handleGameInput(e) {
+            // 입력 잠금 상태거나, 게임 중이 아니면 무시
+            if (inputLocked || gameState !== 'PLAYING') return;
+            
+            // 터치/마우스 기본 동작 방지 (스크롤 등)
+            // 단, 버튼 클릭 등 UI 상호작용은 막지 않아야 하므로 
+            // e.target이 캔버스일 때만 preventDefault 적용
+            if (e.target === canvas && e.cancelable) {
+                e.preventDefault();
             }
-
-            if (gameState === 'PLAYING') {
-                bird.jump();
-            } else if (gameState === 'START' || gameState === 'GAMEOVER') {
-                // UI 버튼이 처리하므로 여기서는 패스하거나, 
-                // 키보드 스페이스바의 경우 버튼 클릭 효과를 줄 수 있음
-                if (e.code === 'Space') {
-                    if (gameState === 'START') startGame();
-                    if (gameState === 'GAMEOVER') startGame();
-                }
-            }
+            
+            bird.jump();
         }
 
-        // 이벤트 리스너 등록
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space') handleInput(e);
-        });
-        
-        // 캔버스 터치/클릭
-        canvas.addEventListener('touchstart', handleInput, {passive: false});
-        canvas.addEventListener('mousedown', handleInput);
-
-        // [수정됨] 버튼 이벤트 (모바일 터치 반응성 개선)
-        function handleBtnTouch(e) {
-            if (e.cancelable) e.preventDefault(); // 터치 시 고스트 클릭 및 확대 방지
+        // 2. 다시하기 / 시작하기 버튼 핸들러 (강력한 전파 방지)
+        function handleButtonClick(e) {
+            // 이벤트 전파를 막아 뒤의 캔버스가 눌리지 않게 함
+            e.stopPropagation();
+            // 기본 동작(폼 제출 등) 방지
+            if (e.cancelable) e.preventDefault();
+            
             startGame();
         }
 
-        startBtn.addEventListener('click', startGame);
-        startBtn.addEventListener('touchstart', handleBtnTouch, {passive: false});
+        // 캔버스 입력 리스너
+        // touchstart는 반응 속도가 빠름
+        canvas.addEventListener('touchstart', handleGameInput, {passive: false});
+        canvas.addEventListener('mousedown', handleGameInput);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if (gameState === 'PLAYING') handleGameInput(e);
+                else handleButtonClick(e); // 스페이스바로 시작/재시작
+            }
+        });
 
-        restartBtn.addEventListener('click', startGame);
-        restartBtn.addEventListener('touchstart', handleBtnTouch, {passive: false});
+        // 버튼 입력 리스너 (touchend와 click을 모두 사용하여 호환성 확보)
+        // 모바일: touchend -> handleButtonClick 실행
+        // PC: click -> handleButtonClick 실행
+        
+        // [시작 버튼]
+        startBtn.addEventListener('touchend', handleButtonClick, {passive: false});
+        startBtn.addEventListener('click', handleButtonClick);
+        
+        // [다시하기 버튼]
+        restartBtn.addEventListener('touchend', handleButtonClick, {passive: false});
+        restartBtn.addEventListener('click', handleButtonClick);
 
-        // 초기 화면 렌더링 (배경만)
-        background.update(); // 구름 몇 개 생성
-        background.draw();
+        // 초기 루프 시작
+        loop();
 
     </script>
 </body>
