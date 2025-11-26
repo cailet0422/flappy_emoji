@@ -68,7 +68,7 @@
             <h1 class="text-5xl font-bold text-blue-600 mb-2">Flying Emoji</h1>
             <p class="text-gray-600 mb-6 text-lg">이모지가 되어 건물 사이를 날아보세요!</p>
             <div class="text-6xl animate-bounce mb-6">🤪</div>
-            <p class="text-sm text-gray-500 mb-4">터치 또는 클릭으로 점프<br>점프할 때마다 표정이 바뀝니다!</p>
+            <p class="text-sm text-gray-500 mb-4">터치 또는 클릭으로 점프<br>5점마다 속도가 빨라집니다!</p>
             <button id="startBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 px-10 rounded-full text-2xl shadow-lg btn-press">
                 게임 시작
             </button>
@@ -111,14 +111,24 @@
         const startBtn = document.getElementById('startBtn');
         const restartBtn = document.getElementById('restartBtn');
 
+        // 오디오 설정 (동전 효과음)
+        // 무료 효과음 URL 사용
+        const coinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
+        coinSound.volume = 0.5; // 볼륨 조절
+
         // 게임 상태
         let gameState = 'START'; // START, PLAYING, GAMEOVER
         let frames = 0;
         let score = 0;
         let highScore = localStorage.getItem('flyingEmojiHighScore') || 0;
-        let gameSpeed = 3;
         
-        // 입력 딜레이 (모바일에서 버튼 누른 후 바로 점프되는 현상 방지)
+        // 속도 관련 변수
+        const baseSpeed = 3; // 기본 속도 (100%)
+        const maxSpeed = baseSpeed * 1.5; // 최대 속도 (150% = 4.5)
+        const speedIncrement = baseSpeed * 0.1; // 증가량 (10% = 0.3)
+        let gameSpeed = baseSpeed;
+        
+        // 입력 딜레이
         let inputLocked = false;
 
         // 이모지 데이터
@@ -142,7 +152,7 @@
             radius: 20,
             velocity: 0,
             gravity: 0.25,
-            jumpStrength: 7, // 점프 힘 
+            jumpStrength: 7, 
             currentEmoji: '😀',
             rotation: 0,
 
@@ -157,7 +167,7 @@
                 ctx.font = `${this.radius * 2.2}px Arial`; 
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                ctx.fillText(this.currentEmoji, 0, 5); // 약간의 y 보정
+                ctx.fillText(this.currentEmoji, 0, 5); 
                 ctx.restore();
             },
 
@@ -224,31 +234,26 @@
             },
 
             update: function() {
-                // 장애물 생성 주기
-                const spawnRate = Math.floor(100 + (canvas.width / 10)); 
+                // 장애물 생성 주기 (속도가 빨라지면 생성 주기도 빨라져야 자연스러움)
+                // 속도 비율에 맞춰 보정: 기본속도(3)/현재속도 * 기본주기
+                const speedRatio = baseSpeed / gameSpeed;
+                const baseSpawnRate = Math.floor(100 + (canvas.width / 10));
+                const currentSpawnRate = Math.floor(baseSpawnRate * speedRatio);
                 
-                if (frames % spawnRate === 0) {
+                if (frames % currentSpawnRate === 0) {
                     // 갭 크기 랜덤 설정
-                    
-                    // 1. 최댓값: 기존 기본값(화면 높이의 25% 또는 160px)보다 1.2배 정도 크게
                     const maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
-                    
-                    // 2. 최소값: 이모지 시각적 크기(지름 * 1.1 정도인 폰트사이즈)의 1.5배
-                    // bird.radius * 2.2는 현재 이모지가 그려지는 폰트 크기입니다.
                     const minGap = (bird.radius * 2.2) * 1.5;
-
-                    // 3. 랜덤 갭 계산 (최소 ~ 최대 사이)
                     const gap = Math.random() * (maxGap - minGap) + minGap;
 
                     const minHeight = canvas.height * 0.1;
                     const maxTop = canvas.height - minHeight - gap;
                     
-                    // maxTop이 minHeight보다 작아지는 극단적인 경우 방지
+                    let topHeight;
                     if (maxTop < minHeight) {
-                        // 화면이 너무 작을 경우 안전값 사용
-                        var topHeight = minHeight; 
+                        topHeight = minHeight; 
                     } else {
-                        var topHeight = Math.floor(Math.random() * (maxTop - minHeight + 1) + minHeight);
+                        topHeight = Math.floor(Math.random() * (maxTop - minHeight + 1) + minHeight);
                     }
                     
                     const bottomHeight = canvas.height - gap - topHeight;
@@ -282,12 +287,28 @@
                         gameOver();
                     }
 
-                    // 점수
+                    // 점수 및 속도 증가 로직
                     if (obs.x + obs.width < bird.x && !obs.passed) {
                         score++;
                         scoreDisplay.innerText = score;
                         obs.passed = true;
-                        if(score % 5 === 0 && gameSpeed < 6) gameSpeed += 0.2;
+                        
+                        // 5점마다 이벤트 발생
+                        if (score % 5 === 0) {
+                            // 1. 동전 소리 재생
+                            // 연속 재생을 위해 currentTime 초기화
+                            coinSound.currentTime = 0;
+                            coinSound.play().catch(e => console.log('Audio play failed:', e));
+
+                            // 2. 속도 증가 (10%씩)
+                            if (gameSpeed < maxSpeed) {
+                                gameSpeed += speedIncrement;
+                                // 최대 속도 초과 방지
+                                if (gameSpeed > maxSpeed) {
+                                    gameSpeed = maxSpeed;
+                                }
+                            }
+                        }
                     }
 
                     if (obs.x + obs.width < 0) {
@@ -299,7 +320,8 @@
             
             reset: function() {
                 this.list = [];
-                gameSpeed = 3 + (canvas.width > 768 ? 1 : 0); 
+                // 게임 재시작 시 속도 초기화
+                gameSpeed = baseSpeed;
             }
         };
 
@@ -355,32 +377,23 @@
         }
 
         function startGame() {
-            if (gameState === 'PLAYING') return; // 이미 실행중이면 무시
+            if (gameState === 'PLAYING') return;
 
             gameState = 'PLAYING';
             
-            // UI 확실하게 숨기기
+            // 모바일 오디오 컨텍스트 활성화를 위해 사용자 인터랙션 시점에 load() 호출 가능
+            // (현대 브라우저는 사용자 제스처(클릭) 내에서 play() 하면 허용됨)
+            
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
             
             initGame();
             
-            // 모바일에서 버튼 누른 터치가 바로 점프로 이어지지 않도록 딜레이 설정
             inputLocked = true;
             setTimeout(() => {
                 inputLocked = false;
-                // 게임이 멈춰있을 수 있으므로 루프가 돌고 있는지 확인
-                // requestAnimationFrame이 쌓이는 것을 방지하기 위해 loop는 한 번만 호출됨을 보장해야 하지만
-                // 여기서는 간단하게 처리 (중복 호출 방지는 loop 내부에 없음)
-                // loop(); 는 최초 시작시 혹은 재시작시 호출하되, 
-                // 기존 루프가 돌고 있다면 굳이 중복해서 부르지 않아도 되지만 
-                // 안전을 위해 cancelAnimationFrame 등을 쓰지 않는 구조이므로 
-                // 게임오버 시 루프가 멈추지 않고 계속 도는 구조임 (gameState로 제어)
-                // 따라서 별도 호출 불필요. update/draw만 gameState에 따름.
-            }, 60); // 딜레이 0.06초 (60ms)로 수정
+            }, 60);
 
-            // 루프 시작 (게임 오버시에도 루프는 계속 돌고 있으므로, 상태만 변경하면 됨)
-            // 만약 루프가 끊겼다면 다시 불러줘야 함
             if (!animationId) {
                 loop();
             }
@@ -403,7 +416,6 @@
             finalScoreEl.innerText = score;
             bestScoreEl.innerText = highScore;
             
-            // 화면 확실하게 보이기
             gameOverScreen.style.display = 'flex';
         }
 
@@ -423,22 +435,17 @@
                 obstacles.draw();
                 bird.draw();
             } else if (gameState === 'START') {
-                 // 시작 화면에서도 배경 구름 움직임
+                 
             }
 
             animationId = requestAnimationFrame(loop);
         }
 
-        // --- 입력 및 이벤트 처리 (새로 작성된 부분) ---
+        // --- 입력 및 이벤트 처리 ---
 
-        // 1. 게임 플레이 중 점프 핸들러
         function handleGameInput(e) {
-            // 입력 잠금 상태거나, 게임 중이 아니면 무시
             if (inputLocked || gameState !== 'PLAYING') return;
             
-            // 터치/마우스 기본 동작 방지 (스크롤 등)
-            // 단, 버튼 클릭 등 UI 상호작용은 막지 않아야 하므로 
-            // e.target이 캔버스일 때만 preventDefault 적용
             if (e.target === canvas && e.cancelable) {
                 e.preventDefault();
             }
@@ -446,40 +453,28 @@
             bird.jump();
         }
 
-        // 2. 다시하기 / 시작하기 버튼 핸들러 (강력한 전파 방지)
         function handleButtonClick(e) {
-            // 이벤트 전파를 막아 뒤의 캔버스가 눌리지 않게 함
             e.stopPropagation();
-            // 기본 동작(폼 제출 등) 방지
             if (e.cancelable) e.preventDefault();
             
             startGame();
         }
 
-        // 캔버스 입력 리스너
-        // touchstart는 반응 속도가 빠름
         canvas.addEventListener('touchstart', handleGameInput, {passive: false});
         canvas.addEventListener('mousedown', handleGameInput);
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Space') {
                 if (gameState === 'PLAYING') handleGameInput(e);
-                else handleButtonClick(e); // 스페이스바로 시작/재시작
+                else handleButtonClick(e); 
             }
         });
 
-        // 버튼 입력 리스너 (touchend와 click을 모두 사용하여 호환성 확보)
-        // 모바일: touchend -> handleButtonClick 실행
-        // PC: click -> handleButtonClick 실행
-        
-        // [시작 버튼]
         startBtn.addEventListener('touchend', handleButtonClick, {passive: false});
         startBtn.addEventListener('click', handleButtonClick);
         
-        // [다시하기 버튼]
         restartBtn.addEventListener('touchend', handleButtonClick, {passive: false});
         restartBtn.addEventListener('click', handleButtonClick);
 
-        // 초기 루프 시작
         loop();
 
     </script>
