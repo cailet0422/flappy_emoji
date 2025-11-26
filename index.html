@@ -207,7 +207,8 @@
         // 장애물 (건물들)
         const obstacles = {
             list: [],
-            spawnTimer: 0,
+            distanceSinceLastSpawn: 0, // 마지막 생성 이후 이동한 거리
+            nextSpawnDistance: 0,      // 다음 생성까지 필요한 거리
             
             draw: function() {
                 for (let i = 0; i < this.list.length; i++) {
@@ -234,25 +235,18 @@
             },
 
             update: function() {
-                // [수정됨] 장애물 생성 주기 로직 개선
-                // 기존: 화면 너비(canvas.width)에 의존하여 가로가 넓으면 너무 쉬웠음.
-                // 변경: bird.radius(플레이어 크기)를 기준으로 거리를 계산하여 모든 해상도에서 형평성 유지.
+                // [수정됨] 거리 기반 랜덤 생성 로직
                 
-                // 장애물 간의 물리적 거리 (픽셀) = 새 반지름 * 22 (적절한 간격 계수)
-                const distanceBetweenObstacles = bird.radius * 22;
-                
-                // 프레임 단위 생성 주기 = 거리 / 현재 속도
-                const currentSpawnRate = Math.floor(distanceBetweenObstacles / gameSpeed);
-                
-                if (frames % currentSpawnRate === 0) {
-                    // 갭 크기 랜덤 설정
+                // 1. 이동 거리 누적
+                this.distanceSinceLastSpawn += gameSpeed;
+
+                // 2. 생성 시점 도달 체크
+                if (this.distanceSinceLastSpawn >= this.nextSpawnDistance) {
+                    
+                    // 갭 크기 설정 (기존 로직 유지: 랜덤 높이)
                     const maxGap = Math.max(160, canvas.height * 0.25) * 1.2;
-                    // 최소값: 이모지 크기의 1.5배 -> 3.0배로 증가 (기존 대비 2배 넓힘)
                     const minGap = (bird.radius * 2.2) * 3.0;
-                    
-                    // minGap이 maxGap보다 커지는 경우 방지 (최댓값 보정)
                     const actualMaxGap = Math.max(maxGap, minGap + 10);
-                    
                     const gap = Math.random() * (actualMaxGap - minGap) + minGap;
 
                     const minHeight = canvas.height * 0.1;
@@ -267,6 +261,7 @@
                     
                     const bottomHeight = canvas.height - gap - topHeight;
 
+                    // 장애물 추가
                     this.list.push({
                         x: canvas.width,
                         width: bird.radius * 3.5, 
@@ -275,6 +270,21 @@
                         passed: false,
                         buildingType: buildingEmojis[Math.floor(Math.random() * buildingEmojis.length)]
                     });
+
+                    // 3. 다음 생성 거리(Interval) 랜덤 설정
+                    // 기준 거리: bird.radius * 22
+                    const baseDistance = bird.radius * 22;
+                    
+                    // 최소: 기준의 50% (절반)
+                    const minDistance = baseDistance * 0.5;
+                    // 최대: 기준의 120% (20% 더 넓게)
+                    const maxDistance = baseDistance * 1.2;
+                    
+                    // 랜덤 거리 설정
+                    this.nextSpawnDistance = Math.random() * (maxDistance - minDistance) + minDistance;
+                    
+                    // 누적 거리 초기화
+                    this.distanceSinceLastSpawn = 0;
                 }
 
                 for (let i = 0; i < this.list.length; i++) {
@@ -331,6 +341,11 @@
                 this.list = [];
                 // 게임 재시작 시 속도 초기화
                 gameSpeed = baseSpeed;
+                
+                // 거리 관련 변수 초기화
+                this.distanceSinceLastSpawn = 0;
+                // 첫 장애물은 약간의 여유를 두고 생성 (기준 거리만큼)
+                this.nextSpawnDistance = bird.radius * 22;
             }
         };
 
