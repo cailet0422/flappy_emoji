@@ -130,19 +130,19 @@
         
         // 입력 딜레이
         let inputLocked = false;
-
-        // 이모지 데이터
-        const faceEmojis = ['😀', '😃', '😄', '😆', '😅', '😂', '🤣', '🥲', '😛', '😜', '🤪', '😎', '🤩', '🥳', '🥴', '🤯', '🤠', '🥺', '😡', '😱'];
-        const buildingEmojis = ['🏢', '🏬', '🏭', '🏥', '🏦', '🏫', '🏨'];
-
-        // [추가됨] 화면 크기에 따른 속도 설정 함수
+        // [수정됨] OS 감지에 따른 속도 설정 함수
         function setGameSpeedParams() {
-            // 화면 너비가 768px 미만(모바일)이면 속도를 25% 줄임 (3 -> 2.25)
-            // PC 등 넓은 화면이면 원래 속도 (3)
-            if (window.innerWidth < 768) {
-                baseSpeed = 2.25; 
+            const ua = navigator.userAgent;
+            
+            // Android 또는 iOS(iPhone, iPad, iPod) 감지
+            // 참고: iPadOS 13+부터는 데스크탑 모드로 동작하여 MacIntel로 표시될 수 있으므로 터치 포인트도 함께 확인
+            const isAndroid = /Android/i.test(ua);
+            const isIOS = /iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+            if (isAndroid || isIOS) {
+                baseSpeed = 2.25; // 모바일 OS면 속도를 25% 줄임 (3 -> 2.25)
             } else {
-                baseSpeed = 3;
+                baseSpeed = 3;    // PC 및 기타 OS는 기본 속도
             }
             
             // 파생 변수 업데이트
@@ -159,7 +159,7 @@
         function resizeCanvas() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            setGameSpeedParams(); // 화면 크기 변경 시 속도 재계산
+            setGameSpeedParams(); // 화면 크기 변경 시(또는 초기 로드 시) OS 체크 및 속도 설정
         }
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas(); // 초기 실행
