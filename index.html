@@ -150,26 +150,88 @@
         const coinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3');
         coinSound.volume = 0.5; 
 
-        // [수정됨] 배경음악 (BGM) - If I Had a Chicken by Kevin MacLeod (주소 수정 및 백업 추가)
-        // 라이선스: Creative Commons: By Attribution 4.0 License
-        // 1순위: Kevin MacLeod 공식 (파일명 'If' 추가됨)
-        const bgm = new Audio('https://incompetech.com/music/royalty-free/mp3-royaltyfree/If%20I%20Had%20A%20Chicken.mp3');
+        // [수정됨] Web Audio API 기반 BGM 생성기 (파일 로딩 없음 = 에러 0%)
+        // 코드로 직접 멜로디를 연주하므로 링크가 끊길 일이 없습니다.
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        // 백업용 음악 (Mixkit - Comical)
-        const backupBgmUrl = 'https://assets.mixkit.co/music/preview/mixkit-comical-2-22.mp3';
+        // 간단한 멜로디 시퀀스 (If I Had a Chicken 스타일의 통통 튀는 느낌)
+        const melody = [
+            { note: 261.63, duration: 0.2 }, { note: 0, duration: 0.1 }, // C4
+            { note: 329.63, duration: 0.2 }, { note: 0, duration: 0.1 }, // E4
+            { note: 392.00, duration: 0.2 }, { note: 0, duration: 0.1 }, // G4
+            { note: 329.63, duration: 0.2 }, { note: 0, duration: 0.1 }, // E4
+            { note: 261.63, duration: 0.2 }, { note: 0, duration: 0.1 }, // C4
+            { note: 329.63, duration: 0.2 }, { note: 0, duration: 0.1 }, // E4
+            { note: 293.66, duration: 0.4 }, { note: 0, duration: 0.2 }, // D4
+            
+            { note: 293.66, duration: 0.2 }, { note: 0, duration: 0.1 }, // D4
+            { note: 349.23, duration: 0.2 }, { note: 0, duration: 0.1 }, // F4
+            { note: 392.00, duration: 0.2 }, { note: 0, duration: 0.1 }, // G4
+            { note: 349.23, duration: 0.2 }, { note: 0, duration: 0.1 }, // F4
+            { note: 293.66, duration: 0.2 }, { note: 0, duration: 0.1 }, // D4
+            { note: 349.23, duration: 0.2 }, { note: 0, duration: 0.1 }, // F4
+            { note: 261.63, duration: 0.4 }, { note: 0, duration: 0.2 }, // C4
+        ];
+        
+        let noteIndex = 0;
+        let nextNoteTime = 0;
+        let isPlayingBgm = false;
+        let timerID;
 
-        bgm.loop = true; // 반복 재생
-        bgm.volume = 0.3; // 배경음악 볼륨
+        function playBgmNote() {
+            if (!isPlayingBgm) return;
 
-        // 음악 로드 실패 시 백업으로 전환
-        bgm.onerror = function() {
-            console.warn("메인 BGM 로드 실패. 백업 음원으로 전환합니다.");
-            bgm.src = backupBgmUrl;
-            // 게임 중이라면 바로 재생 시도
-            if (gameState === 'PLAYING') {
-                bgm.play().catch(e => console.log('Backup BGM play failed:', e));
+            const now = audioCtx.currentTime;
+            
+            // 다음 음을 예약할 시간이 되었는지 확인 (0.1초 미리 예약)
+            while (nextNoteTime < now + 0.1) {
+                const noteData = melody[noteIndex];
+                
+                if (noteData.note > 0) {
+                    const osc = audioCtx.createOscillator();
+                    const gainNode = audioCtx.createGain();
+                    
+                    osc.connect(gainNode);
+                    gainNode.connect(audioCtx.destination);
+                    
+                    // 귀엽고 통통 튀는 소리 (Triangle Wave)
+                    osc.type = 'triangle'; 
+                    osc.frequency.value = noteData.note;
+                    
+                    // 짧고 굵게 (Envelope)
+                    gainNode.gain.setValueAtTime(0.1, nextNoteTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, nextNoteTime + noteData.duration);
+                    
+                    osc.start(nextNoteTime);
+                    osc.stop(nextNoteTime + noteData.duration);
+                }
+
+                // 다음 음으로 이동
+                nextNoteTime += noteData.duration;
+                noteIndex = (noteIndex + 1) % melody.length;
             }
-        };
+            
+            timerID = requestAnimationFrame(playBgmNote);
+        }
+
+        function startBgm() {
+            if (isPlayingBgm) return;
+            
+            // AudioContext는 사용자 제스처 후 재개 필요
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            isPlayingBgm = true;
+            noteIndex = 0;
+            nextNoteTime = audioCtx.currentTime + 0.1;
+            playBgmNote();
+        }
+
+        function stopBgm() {
+            isPlayingBgm = false;
+            cancelAnimationFrame(timerID);
+        }
 
         // 게임 상태
         let gameState = 'START'; 
@@ -546,9 +608,8 @@
             startScreen.style.display = 'none';
             gameOverScreen.style.display = 'none';
 
-            // [추가됨] 배경음악 재생 (게임 시작 시)
-            bgm.currentTime = 0;
-            bgm.play().catch(e => console.log('BGM play failed:', e));
+            // [수정됨] 코드로 만든 BGM 시작
+            startBgm();
             
             initGame();
             
@@ -568,8 +629,8 @@
             if (gameState === 'GAMEOVER') return;
             gameState = 'GAMEOVER';
 
-            // [추가됨] 배경음악 정지 (게임 오버 시)
-            bgm.pause();
+            // [수정됨] BGM 정지
+            stopBgm();
             
             scoreDisplay.classList.add('hidden');
             highScoreDisplay.classList.add('hidden');
